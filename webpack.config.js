@@ -8,8 +8,12 @@ var WebpackExtractTextPlugin = require('extract-text-webpack-plugin');
 var LiveReloadPlugin = require('webpack-livereload-plugin');
 var extend = require('extend');
 var autoprefixer = require('autoprefixer');
+var parseArgs = require('minimist');
 
 var isProduction = process.env.NODE_ENV === 'production';
+var isServer = process.argv.toString().includes('webpack-dev-server');
+var CLIArgs = parseArgs(process.argv.slice(2));
+var webDemoURL = CLIArgs['webdemo-url'] || 'http://kotlin-web-demo-cloud.passive.aws.intellij.net';
 
 var webpackConfig = {
   entry: {
@@ -20,7 +24,8 @@ var webpackConfig = {
     'grammar': 'page/grammar.js',
     'community': 'page/community/community.js',
     'styles': 'styles.scss',
-    'pdf': 'page/pdf.js'
+    'pdf': 'page/pdf.js',
+    'api': 'page/api/api.js'
   },
   output: {
     path: path.join(__dirname, '_assets'),
@@ -35,6 +40,17 @@ var webpackConfig = {
 
   module: {
     loaders: [
+      {
+        test: /\.monk$/,
+        loader: 'monkberry-loader'
+      },
+      {
+        test: /\.js$/,
+        loader: 'babel-loader',
+        include: [
+          path.resolve(__dirname, 'static/js')
+        ]
+      },
       {
         test: /\.css$/,
         loader: WebpackExtractTextPlugin.extract([
@@ -86,16 +102,34 @@ var webpackConfig = {
     new Webpack.ProvidePlugin({
       $: 'jquery',
       jQuery: 'jquery',
-      'window.jQuery': 'jquery'
+      'window.jQuery': 'jquery',
+      fetch: 'imports?this=>global!exports?global.fetch!whatwg-fetch',
+      Promise: 'imports?this=>global!exports?global.Promise!core-js/es6/promise'
     }),
 
-    new WebpackExtractTextPlugin('[name].css'),
+    new Webpack.DefinePlugin({
+      webDemoURL: JSON.stringify(webDemoURL)
+    }),
 
+    new WebpackExtractTextPlugin('[name].css')
+  ],
+
+  devServer: {
+    proxy: {
+      '/**': {
+        target: 'http://localhost:5000'
+      }
+    }
+  }
+};
+
+if (!isServer) {
+  webpackConfig.plugins.push(
     new LiveReloadPlugin({
       appendScriptTag: false
     })
-  ]
-};
+  );
+}
 
 module.exports = webpackConfig;
 
